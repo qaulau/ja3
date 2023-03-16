@@ -15,6 +15,17 @@ import (
 	utls "github.com/qaulau/utls"
 )
 
+const (
+	// clients
+	helloGolang           = "Golang"
+	helloRandomizedALPN   = "Randomized-ALPN"
+	helloRandomizedNoALPN = "Randomized-NoALPN"
+	helloFirefox          = "Firefox"
+	helloChrome           = "Chrome"
+	helloIOS              = "iOS"
+	helloAndroid          = "Android"
+)
+
 var errProtocolNegotiated = errors.New("protocol negotiated")
 
 type Browser struct {
@@ -118,19 +129,45 @@ func (rt *JA3Transport) dialTLS(ctx context.Context, network, addr string) (net.
 		host = addr
 	}
 	//////////////////
+	var helloId utls.ClientHelloID
+	var spec *utls.ClientHelloSpec
 
-	spec, err := StringToSpec(rt.JA3, rt.UserAgent)
-	if err != nil {
-		return nil, err
+	if strings.Index(rt.JA3, ",") == -1{
+		spec = nil
+		switch rt.JA3 {
+		case helloChrome:
+			helloId = utls.HelloChrome_Auto
+		case helloIOS:
+			helloId = utls.HelloIOS_Auto
+		case helloFirefox:
+			helloId = utls.HelloFirefox_Auto
+		case helloGolang:
+			helloId = utls.HelloGolang
+		case helloRandomizedNoALPN:
+			helloId = utls.HelloRandomizedNoALPN
+		case helloRandomizedALPN:
+			helloId = utls.HelloRandomizedALPN
+		default:
+			helloId = utls.HelloRandomized
+		}
+	}else{
+		helloId = utls.HelloCustom
+		spec, err = StringToSpec(rt.JA3, rt.UserAgent)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 
 	conn := utls.UClient(rawConn, &utls.Config{ServerName: host, InsecureSkipVerify: true}, // MinVersion:         tls.VersionTLS10,
 		// MaxVersion:         tls.VersionTLS13,
 
-		utls.HelloCustom)
+		helloId)
 
-	if err := conn.ApplyPreset(spec); err != nil {
-		return nil, err
+	if spec != nil {
+		if err := conn.ApplyPreset(spec); err != nil {
+			return nil, err
+		}
 	}
 
 	if err = conn.Handshake(); err != nil {
